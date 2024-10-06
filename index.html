@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepFake Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 20px;
+            width: 480px;
+            height: 180px;
+            padding: 20px;
+            margin: 20px auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #drop-area.highlight {
+            border-color: purple;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        #gallery {
+            margin-top: 20px;
+        }
+
+        #gallery img,
+        #gallery video {
+            max-width: 100%;
+            max-height: 300px;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>DeepFake Detection</h1>
+    <div id="drop-area">
+        <form class="my-form">
+            <p>Upload an image or video file using the button below or by dragging and dropping onto the dashed region
+            </p>
+            <input type="file" id="file-input" accept="image/*,video/*" onchange="handleFiles(this.files)">
+            <label class="button" for="file-input">Select a file</label>
+        </form>
+    </div>
+    <div id="gallery"></div>
+    <div id="result"></div>
+
+    <script>
+        let dropArea = document.getElementById('drop-area');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropArea.classList.add('highlight');
+        }
+
+        function unhighlight(e) {
+            dropArea.classList.remove('highlight');
+        }
+
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            let dt = e.dataTransfer;
+            let files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            ([...files]).forEach(uploadFile);
+        }
+
+        function uploadFile(file) {
+            let url = '/detect';
+            let formData = new FormData();
+
+            formData.append('file', file);
+
+            fetch(url, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(result => {
+                    displayResult(result);
+                    previewFile(file);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('result').textContent = 'An error occurred during processing.';
+                });
+        }
+
+        function displayResult(result) {
+            let resultDiv = document.getElementById('result');
+            if (result.error) {
+                resultDiv.textContent = 'Error: ' + result.error;
+            } else {
+                resultDiv.textContent = `Prediction: ${result.is_deepfake ? 'DeepFake' : 'Real'} (Confidence: ${(result.confidence * 100).toFixed(2)}%)`;
+            }
+        }
+
+        function previewFile(file) {
+            let reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = function () {
+                let img = document.createElement('img');
+                img.src = reader.result;
+                document.getElementById('gallery').innerHTML = '';
+                if (file.type.startsWith('image/')) {
+                    document.getElementById('gallery').appendChild(img);
+                } else if (file.type.startsWith('video/')) {
+                    let video = document.createElement('video');
+                    video.src = reader.result;
+                    video.controls = true;
+                    document.getElementById('gallery').appendChild(video);
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
